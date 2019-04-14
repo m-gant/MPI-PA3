@@ -44,11 +44,6 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 
     MPI_Comm_split(comm, color, cartesian_coords[0], &column_comm);
 
-    int column_rank, column_size;
-    MPI_Comm_rank(column_comm, &column_rank);
-    MPI_Comm_size(column_comm, &column_size);
-
-
     //We send out the vector along the first column
     if (cartesian_coords[1] == 0) {
         
@@ -76,8 +71,13 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
         int local_vector_size = cartesian_coords[0] < (n %q) ? ceil( ((double)n) / q) : floor(((double)n) /q);
         *local_vector = (double *) malloc(sizeof(double) * local_vector_size);
 
+
+        int root;
+        int root_coordinates[2] = {0,0};
+        MPI_Cart_rank(column_comm, root_coordinates, &root);
+
         MPI_Scatterv(input_vector, send_counts, displacements,
-            MPI_DOUBLE, *local_vector, 100, MPI_DOUBLE, 0, column_comm);
+            MPI_DOUBLE, *local_vector, 100, MPI_DOUBLE, root, column_comm);
 
         free(send_counts);
         free(displacements);
@@ -95,7 +95,84 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 
 void distribute_matrix(const int n, double* input_matrix, double** local_matrix, MPI_Comm comm)
 {
-    
+
+    int p, global_rank;
+
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &global_rank);
+
+    int q = sqrt(p);
+
+    int cartesian_coords[2];
+    MPI_Cart_coords(comm, global_rank, 2, cartesian_coords);
+
+
+    int row_size = cartesian_coords[0] < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
+    int column_size = cartesian_coords[1] < (n%q) ? ceil(((double)n) / q) : floor(((double)n) / q);
+
+    int matrix_size = row_size * column_size;
+    *local_matrix = (double *) malloc(sizeof(double) * matrix_size);
+
+
+
+    //We are at (0,0). We will build matrices to send to other processes
+    if (cartesian_coords[0] == 0 && cartesian_coords[1] == 0) {
+
+
+
+        int row_offset = 0;
+        int col_offset = 0;
+
+        for (int row = 0; row < q; ++row) {
+            int amt_of_sending_rows = row < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
+            
+            for (int column = 0; column < q; ++column) {
+                int destination_rank;
+
+                int destination_coordinates[2] = {row, column};
+
+                MPI_Cart_rank(comm, destination_coordinates, &destination_rank);
+
+                
+                int amt_of_sending_column = column < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
+
+                int size_of_sending_matrix = amt_of_sending_rows * amt_of_sending_column;
+                double * matrix_to_send = (double *) malloc(sizeof(double) * size_of_sending_matrix);
+
+                int index_of_sending_matrix = 0;
+                //Build matrix to send to processor
+                for (int i = 0; i < amt_of_sending_rows; ++i) {
+
+                    for (int j = 0; j < amt_of_sending_rows; ++j) {
+                        matrix_to_send[index_of_sending_matrix++] = input_matrix[row_offset * n  + (i * n) + j + col_offset];
+                    }
+
+                }
+
+
+                col_offset += amt_of_sending_column;
+
+                MPI_Send(matrix_to_send, size_of_sending_matrix, MPI_DOUBLE, destination_rank, 200, comm);
+
+
+                free(matrix_to_send);
+
+
+            }
+
+            row_offset += amt_of_sending_rows;
+            col_offset = 0;
+        }
+
+    }
+
+    int root_rank;
+    int root_coordinates[2] = {0,0};
+    MPI_Cart_rank(comm, root_coordinates, &root_rank);
+
+    MPI_Status status;
+    MPI_Recv(*local_matrix, matrix_size, MPI_DOUBLE, root_rank, 200, comm, &status);
+
 }
 
 
