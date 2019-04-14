@@ -44,6 +44,25 @@ void get_grid_comm(MPI_Comm* grid_comm)
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, grid_comm);
 }
 
+
+
+TEST(MpiTest, VectorDistribution1) 
+{
+    // simple 4 by 4 input matrix
+    double x[4] =  {6., 25., -11., 15.};
+    double y[4];
+    
+
+
+
+    MPI_Comm grid_comm;
+    get_grid_comm(&grid_comm);
+
+
+    double expected_y[4] = {13.,  325., -138.,  206.};
+    int n = 4;
+}
+
 // test parallel MPI matrix vector multiplication
 TEST(MpiTest, MatrixVectorMult1)
 {
