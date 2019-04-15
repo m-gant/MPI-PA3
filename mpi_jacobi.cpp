@@ -72,12 +72,8 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
         *local_vector = (double *) malloc(sizeof(double) * local_vector_size);
 
 
-        int root;
-        int root_coordinates[2] = {0,0};
-        MPI_Cart_rank(column_comm, root_coordinates, &root);
-
         MPI_Scatterv(input_vector, send_counts, displacements,
-            MPI_DOUBLE, *local_vector, 100, MPI_DOUBLE, root, column_comm);
+            MPI_DOUBLE, *local_vector, 100, MPI_DOUBLE, 0, column_comm);
 
         free(send_counts);
         free(displacements);
@@ -90,7 +86,56 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 // gather the local vector distributed among (i,0) to the processor (0,0)
 void gather_vector(const int n, double* local_vector, double* output_vector, MPI_Comm comm)
 {
-    // TODO
+    int p, global_rank;
+
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &global_rank);
+
+    int q = sqrt(p);
+    
+    //Find the cartesian coordinates from the global rank
+    int cartesian_coords[2];
+    MPI_Cart_coords(comm, global_rank, 2, cartesian_coords);
+
+    //We split communicator along the columns
+    int color = cartesian_coords[1];
+    MPI_Comm column_comm;
+
+    MPI_Comm_split(comm, color, cartesian_coords[0], &column_comm);
+
+    //We recv all vectors along the first column
+    if (cartesian_coords[1] == 0) {
+        
+        //Setting up a gatherv call. Recvcounts describes how many elements are on each proc
+        //and displacements is an array describing the beginning of each segment in the recvbuff
+        int* recv_counts = (int *) malloc(sizeof(int) * q);
+        int* displacements = (int *) malloc(sizeof(int) * q);
+
+        int current_displacement = 0; //used to calculate displacement
+
+        //iterate through each row in grid column 0. Calculate amount of vector elements
+        //to send based off specs
+        for (int r = 0; r < q; ++r) {
+
+            //Calculates the local vector size based off row
+            int other_local_vector_size = r < (n % q) ? ceil( ((double)n) / q) : floor( ((double)n) / q);
+
+            recv_counts[r] = other_local_vector_size;
+            displacements[r] = current_displacement;
+            current_displacement += other_local_vector_size;
+        }
+
+        std::cout<< "local vector displacements created" << std::endl;
+
+        int this_local_vector_size = cartesian_coords[0] < (n % q) ? ceil( ((double)n) / q) : floor( ((double)n) / q);
+
+        MPI_Gatherv(local_vector, this_local_vector_size, MPI_DOUBLE, output_vector,
+            recv_counts, displacements, MPI_DOUBLE, 0, column_comm);
+
+        free(recv_counts);
+        free(displacements);
+    }
+
 }
 
 void distribute_matrix(const int n, double* input_matrix, double** local_matrix, MPI_Comm comm)
@@ -218,13 +263,50 @@ void mpi_jacobi(const int n, double* A, double* b, double* x, MPI_Comm comm,
                 int max_iter, double l2_termination)
 {
 
+    int p, global_rank;
 
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &global_rank);
+
+    if (p == 0) {
+        for (int i = 0; i < n; i++) {
+            std::cout << b[i] << " ";
+        }
+
+        std::cout << std::endl;
+    }
 
     // distribute the array onto local processors!
     double* local_A = NULL;
     double* local_b = NULL;
-    distribute_matrix(n, &A[0], &local_A, comm);
+    // distribute_matrix(n, &A[0], &local_A, comm);
     distribute_vector(n, &b[0], &local_b, comm);
+
+    // std::cout<< "processor: " << global_rank << " ";
+    // for (int i = 0; i < n; i++) {
+    //     std::cout << local_b[i] << " " ;
+    // }
+
+    // std::cout << std::endl;
+
+
+    double* gathered_b = (double * ) malloc(sizeof(double) * n);
+
+    gather_vector(n, local_b, gathered_b, comm);
+
+    if (global_rank == 0) {
+
+        for (int i = 0; i < n; i++) {
+            std::cout << gathered_b[i] << " ";
+        }
+
+        std::cout << std::endl;
+
+
+    }
+
+
+
 
     // allocate local result space
     // double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
