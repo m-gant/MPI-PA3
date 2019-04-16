@@ -125,7 +125,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
             current_displacement += other_local_vector_size;
         }
 
-        std::cout<< "local vector displacements created" << std::endl;
+        // std::cout<< "local vector displacements created" << std::endl;
 
         int this_local_vector_size = cartesian_coords[0] < (n % q) ? ceil( ((double)n) / q) : floor( ((double)n) / q);
 
