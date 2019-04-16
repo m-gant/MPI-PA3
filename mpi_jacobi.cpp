@@ -75,13 +75,10 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
         MPI_Scatterv(input_vector, send_counts, displacements,
             MPI_DOUBLE, *local_vector, 100, MPI_DOUBLE, 0, column_comm);
 
-
-
-
-
         free(send_counts);
         free(displacements);
     }
+
 
 }
 
@@ -128,6 +125,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
             current_displacement += other_local_vector_size;
         }
 
+        std::cout<< "local vector displacements created" << std::endl;
 
         int this_local_vector_size = cartesian_coords[0] < (n % q) ? ceil( ((double)n) / q) : floor( ((double)n) / q);
 
@@ -157,19 +155,10 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     int row_size = cartesian_coords[0] < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
     int column_size = cartesian_coords[1] < (n%q) ? ceil(((double)n) / q) : floor(((double)n) / q);
 
-
-
-    std::cout<< "Hi I'm processor: (";
-    std::cout<< cartesian_coords[0] << "," << cartesian_coords[1];
-    std::cout<< ") and I will receive a matrix of size" << row_size << "x" << column_size << std::endl; 
-
-
-
     int matrix_size = row_size * column_size;
     *local_matrix = (double *) malloc(sizeof(double) * matrix_size);
 
 
-    double * matrix_to_send = NULL;
 
     //We are at (0,0). We will build matrices to send to other processes
     if (cartesian_coords[0] == 0 && cartesian_coords[1] == 0) {
@@ -190,10 +179,10 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
                 MPI_Cart_rank(comm, destination_coordinates, &destination_rank);
 
 
-                int amt_of_sending_columns = column < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
+                int amt_of_sending_column = column < (n % q) ? ceil(((double)n) / q) : floor(((double)n) /q);
 
-                int size_of_sending_matrix = amt_of_sending_rows * amt_of_sending_columns;
-                matrix_to_send = (double *) malloc(sizeof(double) * size_of_sending_matrix);
+                int size_of_sending_matrix = amt_of_sending_rows * amt_of_sending_column;
+                double * matrix_to_send = (double *) malloc(sizeof(double) * size_of_sending_matrix);
 
                 int index_of_sending_matrix = 0;
                 //Build matrix to send to processor
@@ -206,21 +195,12 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
                 }
 
 
-                std::cout << "Sending following values to (" << destination_coordinates[0] << ",";
-                std::cout << destination_coordinates[1] << "): ";
-
-                for (int i = 0; i < size_of_sending_matrix; ++i) {
-                    std::cout<< matrix_to_send[i] << " "; 
-                } 
-
-                std::cout<<std::endl;
-
-                col_offset += amt_of_sending_columns;
+                col_offset += amt_of_sending_column;
 
                 MPI_Send(matrix_to_send, size_of_sending_matrix, MPI_DOUBLE, destination_rank, 200, comm);
 
-                std::cout << "matrix sent!!";
-                std::cout<<std::endl;
+
+                free(matrix_to_send);
 
 
             }
@@ -231,20 +211,12 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 
     }
 
-    free(matrix_to_send);
+    int root_rank;
+    int root_coordinates[2] = {0,0};
+    MPI_Cart_rank(comm, root_coordinates, &root_rank);
 
     MPI_Status status;
-    MPI_Recv(*local_matrix, matrix_size, MPI_DOUBLE, 0, 200, comm, &status);
-
-
-    std::cout<< "Hi I'm processor: (";
-    std::cout<< cartesian_coords[0] << "," << cartesian_coords[1];
-    std::cout<< ") and I received these matrix values: ";
-    for (int i = 0; i < matrix_size; ++i) {
-        std::cout<< (*local_matrix)[i] << " ";
-    }
-
-    std::cout<< std::endl;
+    MPI_Recv(*local_matrix, matrix_size, MPI_DOUBLE, root_rank, 200, comm, &status);
 
 }
 
@@ -256,6 +228,8 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     MPI_Comm_size(comm, &p);
     MPI_Comm_rank(comm, &global_rank);
 
+
+    //std::cout << "•••••••••••••• number of processors = " << p << std::endl;
     int q = sqrt(p);
 
     int cartesian_coords[2];
@@ -272,23 +246,36 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
 
 
     //if we are in column 1 we send our col_vector to the processor (i,i) in our rows
-    int send_amount = row_i < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
-    int recv_amount = col_j < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
+    int num_rows = row_i < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
+    int num_cols = col_j < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
 
     if (col_j == 0) {
-      MPI_Send(col_vector, send_amount, MPI_DOUBLE, row_i, 300, row_comm);
+      // std::cout << "%%%%%%%%%%%%%%%%%% col_vector = "<< std::endl;
+      // for (int i = 0; i < num_rows; i++) {
+      //   std::cout << col_vector[i] << std::endl;
+      // }
+      MPI_Send(col_vector, num_rows, MPI_DOUBLE, row_i, 300, row_comm);
     }
 
 
     //if diagonal processor, I receive the elements from first column and broadcast the value along the column comm.
     if (row_i == col_j) {
       MPI_Status status;
-      MPI_Recv(row_vector, recv_amount, MPI_DOUBLE, 0, 300, row_comm, &status);
 
-      MPI_Bcast(row_vector, recv_amount, MPI_DOUBLE, col_j, column_comm);
+      MPI_Recv(row_vector, num_cols, MPI_DOUBLE, 0, 300, row_comm, &status);
+      // std::cout << " ^^^^^^ this is what whas received ^^^^^ -> " << std::endl;
+      // for (int i = 0; i < num_cols; i++) {
+      //   std::cout << row_vector[i] << std::endl;
+      // }
 
     }
 
+    MPI_Bcast(row_vector, num_cols, MPI_DOUBLE, col_j, column_comm);
+
+    // std::cout << " ****** this is what whas received ****** -> " << std::endl;
+    // for (int i = 0; i < num_cols; i++) {
+    //   std::cout << row_vector[i] << std::endl;
+    // }
 
 }
 
@@ -315,16 +302,17 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
     int num_cols = col_j < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
     int num_rows = row_i < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
     double* row_decomposed_local_x = (double*) malloc(sizeof(double) * num_cols);
+    double* unreduced_local_y = (double*) malloc(sizeof(double) * num_rows);
     transpose_bcast_vector(n, local_x, row_decomposed_local_x, comm);
 
-    std::cout<< "vector transposed" << std::endl;
-
     //multiply row-decomposed vector by the local matrices
-    matrix_vector_mult(num_rows, num_cols, local_A, row_decomposed_local_x, local_y);
+    matrix_vector_mult(num_rows, num_cols, local_A, row_decomposed_local_x, unreduced_local_y);
     free(row_decomposed_local_x);
 
     //reduce along rows
-    MPI_Reduce(local_y, local_y, num_rows, MPI_DOUBLE, MPI_SUM, 0, row_comm);
+
+    MPI_Reduce(unreduced_local_y, local_y, num_rows, MPI_DOUBLE, MPI_SUM, 0, row_comm);
+    free(unreduced_local_y);
 }
 
 // Solves Ax = b using the iterative jacobi method
@@ -443,12 +431,7 @@ void mpi_matrix_vector_mult(const int n, double* A,
     double* local_A = NULL;
     double* local_x = NULL;
     distribute_matrix(n, &A[0], &local_A, comm);
-    std::cout<< "matrix distributed" << std::endl;
-
     distribute_vector(n, &x[0], &local_x, comm);
-
-    std::cout << "vector distributed" << std::endl;
-
 
     // allocate local result space
     double* local_y = new double[block_decompose_by_dim(n, comm, 0)];
@@ -462,18 +445,56 @@ void mpi_matrix_vector_mult(const int n, double* A,
 void mpi_jacobi(const int n, double* A, double* b, double* x, MPI_Comm comm,
                 int max_iter, double l2_termination)
 {
+
+    int p, global_rank;
+
+    MPI_Comm_size(comm, &p);
+    MPI_Comm_rank(comm, &global_rank);
+
+    if (p == 0) {
+        for (int i = 0; i < n; i++) {
+            std::cout << b[i] << " ";
+        }
+
+        std::cout << std::endl;
+    }
+
     // distribute the array onto local processors!
     double* local_A = NULL;
     double* local_b = NULL;
-
-    distribute_matrix(n, &A[0], &local_A, comm);
-
+    // distribute_matrix(n, &A[0], &local_A, comm);
     distribute_vector(n, &b[0], &local_b, comm);
 
-    // allocate local result space
-    double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
-    distributed_jacobi(n, local_A, local_b, local_x, comm, max_iter, l2_termination);
+    // std::cout<< "processor: " << global_rank << " ";
+    // for (int i = 0; i < n; i++) {
+    //     std::cout << local_b[i] << " " ;
+    // }
 
-    // gather results back to rank 0
-    gather_vector(n, local_x, x, comm);
+    // std::cout << std::endl;
+
+
+    double* gathered_b = (double * ) malloc(sizeof(double) * n);
+
+    gather_vector(n, local_b, gathered_b, comm);
+
+    if (global_rank == 0) {
+
+        for (int i = 0; i < n; i++) {
+            std::cout << gathered_b[i] << " ";
+        }
+
+        std::cout << std::endl;
+
+
+    }
+
+
+
+
+    // allocate local result space
+    // double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
+    // distributed_jacobi(n, local_A, local_b, local_x, comm, max_iter, l2_termination);
+
+    // // gather results back to rank 0
+    // gather_vector(n, local_x, x, comm);
 }

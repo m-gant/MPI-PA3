@@ -46,13 +46,11 @@ void get_grid_comm(MPI_Comm* grid_comm)
 
 
 
-TEST(MpiTest, VectorDistribution1) 
+TEST(MpiTest, VectorDistribution1)
 {
     // simple 4 by 4 input matrix
     double x[4] =  {6., 25., -11., 15.};
     double y[4];
-    
-
 
 
     MPI_Comm grid_comm;
@@ -91,6 +89,36 @@ TEST(MpiTest, MatrixVectorMult1)
         EXPECT_NEAR(expected_y[i], y[i], 1e-10) << " element y[" << i << "] is wrong";
     }
 }
+
+// TEST(MpiTest, VectorTranspose1)
+// {
+//
+//     std::cout<<"testing transpose" <<std::endl;
+//     // simple 4 by 4 input matrix
+//
+//     double x[4] =  {6., 25., -11., 15.};
+//     double y[4];
+//     double expected_y[4] = {6., 25., -11., 15.};
+//     int n = 4;
+//
+//     // get grid communicator
+//     MPI_Comm grid_comm;
+//     get_grid_comm(&grid_comm);
+//
+//     // testing sequential matrix multiplication
+//     transpose_bcast_vector(n, x, y, grid_comm);
+//
+//
+//     // checking if all values are correct (up to some error value)
+//     for (int i = 0; i < n; ++i)
+//     {
+//         std::cout << "results = " << y[i] << ", " << expected_y[i] << std::endl;
+//         EXPECT_NEAR(expected_y[i], y[i], 1e-10) << " element y[" << i << "] is wrong";
+//     }
+//
+//     std::cout<<"***** \n done testing transpose \n *****" << std::endl;
+// }
+
 
 
 // test parallel MPI matrix vector multiplication
