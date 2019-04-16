@@ -352,6 +352,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
       for (int i = 0; i < num_rows; i++) {
         local_D[i] = local_A[(i * num_rows) + i]; //diagonal processors have square matrices
         local_R[(i * num_rows) + i] = 0;
+        //std::cout << "•••••• diagonal element " << i << " = " << local_A[(i * num_rows) + i] << std::endl;
       }
       //send diagonal elements to column 0
       MPI_Send(local_D, num_rows, MPI_DOUBLE, 0, 400, row_comm);
@@ -381,7 +382,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 
       //x = (b-p) / D
       if (col_j == 0) {
-        for (int i = 0; i < num_cols; i++) {
+        for (int i = 0; i < num_rows; i++) {
           local_x[i] = (local_b[i] - local_p[i]) / local_D[i];
         }
       }
@@ -403,7 +404,9 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
       //l2^2 = SUM(p's in column 0)
       double global_l2;
       MPI_Allreduce(l2_squared, &global_l2, 1, MPI_DOUBLE, MPI_SUM, comm);
-
+      //std::cout << " %%%%%%%^^^^^^^ l2 = " << global_l2 << std::endl;
+      std::cout << "still chuggin" << std::endl;
+      
       free(local_p);
       free(local_w);
       if (sqrt(global_l2) <= l2_termination) {
@@ -418,6 +421,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 
     free(local_D);
     free(local_R);
+    return;
 
 
 }
@@ -446,55 +450,17 @@ void mpi_jacobi(const int n, double* A, double* b, double* x, MPI_Comm comm,
                 int max_iter, double l2_termination)
 {
 
-    int p, global_rank;
+  // distribute the array onto local processors!
+  double* local_A = NULL;
+  double* local_b = NULL;
+  distribute_matrix(n, &A[0], &local_A, comm);
+  distribute_vector(n, &b[0], &local_b, comm);
 
-    MPI_Comm_size(comm, &p);
-    MPI_Comm_rank(comm, &global_rank);
+  // allocate local result space
+  double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
+  distributed_jacobi(n, local_A, local_b, local_x, comm, max_iter, l2_termination);
 
-    if (p == 0) {
-        for (int i = 0; i < n; i++) {
-            std::cout << b[i] << " ";
-        }
+  // gather results back to rank 0
+  gather_vector(n, local_x, x, comm);
 
-        std::cout << std::endl;
-    }
-
-    // distribute the array onto local processors!
-    double* local_A = NULL;
-    double* local_b = NULL;
-    // distribute_matrix(n, &A[0], &local_A, comm);
-    distribute_vector(n, &b[0], &local_b, comm);
-
-    // std::cout<< "processor: " << global_rank << " ";
-    // for (int i = 0; i < n; i++) {
-    //     std::cout << local_b[i] << " " ;
-    // }
-
-    // std::cout << std::endl;
-
-
-    double* gathered_b = (double * ) malloc(sizeof(double) * n);
-
-    gather_vector(n, local_b, gathered_b, comm);
-
-    if (global_rank == 0) {
-
-        for (int i = 0; i < n; i++) {
-            std::cout << gathered_b[i] << " ";
-        }
-
-        std::cout << std::endl;
-
-
-    }
-
-
-
-
-    // allocate local result space
-    // double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
-    // distributed_jacobi(n, local_A, local_b, local_x, comm, max_iter, l2_termination);
-
-    // // gather results back to rank 0
-    // gather_vector(n, local_x, x, comm);
 }
