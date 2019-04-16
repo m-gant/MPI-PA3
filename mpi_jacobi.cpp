@@ -294,7 +294,7 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
     free(row_decomposed_local_x);
 
     //reduce along rows
-    MPI_Reduce(local_y, num_rows, MPI_DOUBLE, MPI_SUM, 0, row_comm);
+    MPI_Reduce(local_y, local_y, num_rows, MPI_DOUBLE, MPI_SUM, 0, row_comm);
 }
 
 // Solves Ax = b using the iterative jacobi method
@@ -323,7 +323,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
     double* local_R = (double*) malloc(sizeof(double) * num_cols * num_rows);
     for (int i = 0; i < (num_rows * num_cols); i++) {
       //R = deepcopy(A)
-      local_R[i] = A[i];
+      local_R[i] = local_A[i];
     }
 
     double* local_D;
@@ -332,8 +332,8 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
     if (row_i == col_j ) {
       local_D = (double*) malloc(sizeof(double) * num_rows);
       for (int i = 0; i < num_rows; i++) {
-        local_D[i] = A[(i * num_rows) + i]; //diagonal processors have square matrices
-        R[(i * num_rows) + i] = 0;
+        local_D[i] = local_A[(i * num_rows) + i]; //diagonal processors have square matrices
+        local_R[(i * num_rows) + i] = 0;
       }
       //send diagonal elements to column 0
       MPI_Send(local_D, num_rows, MPI_DOUBLE, 0, 400, row_comm);
@@ -344,7 +344,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
     if (col_j == 0) {
       local_D = (double*) malloc(sizeof(double) * num_rows);
       MPI_Status status;
-      MPI_Recv(local_D, num_rows, MPI_DOUBLE, source, 400, comm, status);
+      MPI_Recv(local_D, num_rows, MPI_DOUBLE, row_i, 400, row_comm, &status);
 
       //initialize x to [0 0 ... 0] block distributed along first columns
       for (int i = 0; i < num_rows; i++) {
@@ -378,12 +378,12 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
       if (col_j == 0) {
         for (int i = 0; i < num_rows; i++) {
           local_p[i] = (local_b[i] - local_w[i]) * (local_b[i] - local_w[i]);
-          l2_squared += local_p[i];
+          *l2_squared += local_p[i];
         }
       }
 
       //l2^2 = SUM(p's in column 0)
-      double global_l2
+      double global_l2;
       MPI_Allreduce(l2_squared, &global_l2, 1, MPI_DOUBLE, MPI_SUM, comm);
 
       free(local_p);
@@ -392,7 +392,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
         free(l2_squared);
         free(local_D);
         free(local_R);
-        return
+        return;
       }
 
 
