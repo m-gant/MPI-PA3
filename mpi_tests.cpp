@@ -179,11 +179,15 @@ TEST(MpiTest, JacobiCrossTest1)
     {
         x.resize(n);
         jacobi(n, &A[0], &b[0], &x[0]);
+        std::cout<<"jacobi finished" << std::endl;
     }
 
     // parallel jacobi
-    if (rank == 0)
+    if (rank == 0) {
         mpi_x.resize(n);
+    }
+
+    std::cout << "Calling parallel jacobi" << std::endl;
     mpi_jacobi(n, &A[0], &b[0], &mpi_x[0], grid_comm);
 
     if (rank == 0)

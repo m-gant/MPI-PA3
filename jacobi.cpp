@@ -76,7 +76,7 @@ void jacobi(const int n, double* A, double* b, double* x, int max_iter, double l
     
     double* result_of_R_times_x = (double *) malloc(n * sizeof(double));
 
-    for (int i = 0; i < max_iter; ++i) {
+    for (int i = 0; i < max_iter; i++) {
 
     	//We run the jacobi method
     	//Rx matrix vector multiplication first
@@ -98,8 +98,12 @@ void jacobi(const int n, double* A, double* b, double* x, int max_iter, double l
     	}
 
     	double l2_norm = sqrt(sum_of_squares);
+        std::cout << i << ":" << l2_norm << std::endl;
 
-    	if (l2_norm < l2_termination) break;
+    	if (l2_norm < l2_termination) 
+        {
+            break;
+        }
     }
 
 
