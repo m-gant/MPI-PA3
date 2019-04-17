@@ -74,10 +74,9 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 
         MPI_Scatterv(input_vector, send_counts, displacements,
             MPI_DOUBLE, *local_vector, local_vector_size, MPI_DOUBLE, 0, column_comm);
-        
 
-        free(send_counts);
-        free(displacements);
+
+
 
 
     }
@@ -213,7 +212,7 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
             col_offset = 0;
         }
 
-        free(matrix_to_send);
+      
 
     } else {
 
