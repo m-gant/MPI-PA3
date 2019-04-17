@@ -65,7 +65,6 @@ TEST(MpiTest, VectorDistribution1)
 TEST(MpiTest, MatrixVectorMult1)
 {
 
-    //std::cout<<"testing matrix" <<std::endl;
     // simple 4 by 4 input matrix
     double A[4*4] = {10., -1., 2., 0.,
                            -1., 11., -1., 3.,
@@ -179,7 +178,6 @@ TEST(MpiTest, JacobiCrossTest1)
     {
         x.resize(n);
         jacobi(n, &A[0], &b[0], &x[0]);
-        std::cout<<"jacobi finished" << std::endl;
     }
 
     // parallel jacobi
@@ -187,7 +185,6 @@ TEST(MpiTest, JacobiCrossTest1)
         mpi_x.resize(n);
     }
 
-    std::cout << "Calling parallel jacobi" << std::endl;
     mpi_jacobi(n, &A[0], &b[0], &mpi_x[0], grid_comm);
 
     if (rank == 0)

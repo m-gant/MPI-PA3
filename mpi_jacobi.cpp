@@ -106,6 +106,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     //We recv all vectors along the first column
     if (cartesian_coords[1] == 0) {
 
+
         //Setting up a gatherv call. Recvcounts describes how many elements are on each proc
         //and displacements is an array describing the beginning of each segment in the recvbuff
         int* recv_counts = (int *) malloc(sizeof(int) * q);
@@ -135,7 +136,6 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
         free(recv_counts);
         free(displacements);
     }
-
 }
 
 void distribute_matrix(const int n, double* input_matrix, double** local_matrix, MPI_Comm comm)
@@ -163,8 +163,6 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     //We are at (0,0). We will build matrices to send to other processes
     if (cartesian_coords[0] == 0 && cartesian_coords[1] == 0) {
 
-        std::cout<<"distributing matrix" <<std::endl;
-
 
         int row_offset = 0;
         int col_offset = 0;
@@ -174,7 +172,6 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 
             for (int column = 0; column < q; column++) {
 
-                std::cout<<"building matrix for (" << row << "," << column << std::endl;
                 int destination_rank;
 
                 int destination_coordinates[2] = {row, column};
@@ -198,7 +195,6 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 
                 }
 
-                std::cout << "matrix built" << std::endl;
                 col_offset += amt_of_sending_column;
 
                 if (row == 0 && column == 0) {
@@ -212,7 +208,7 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
             col_offset = 0;
         }
 
-        std::cout<< "Matrix distributed!!" << std::endl;
+
     } else {
 
         int root_rank;
@@ -255,7 +251,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     int num_cols = col_j < (n % q) ? ceil(((double)n) / q) : floor(((double)n) / q);
 
     if (col_j == 0) {
-      // std::cout << "%%%%%%%%%%%%%%%%%% col_vector = "<< std::endl;
+      // ` << "%%%%%%%%%%%%%%%%%% col_vector = "<< std::endl;
       // for (int i = 0; i < num_rows; i++) {
       //   std::cout << col_vector[i] << std::endl;
       // }
@@ -399,32 +395,27 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
       distributed_matrix_vector_mult(n, local_A, local_x, local_w, comm);
 
       //if in column 0, p = (b-w)^2, otherwise p = 0 (helps with Allreduce)
-      double* l2_squared = (double*) malloc(sizeof(double));
-      *l2_squared = 0;
+      double l2_squared = 0;
 
       if (col_j == 0) {
         for (int i = 0; i < num_rows; i++) {
           local_p[i] = (local_b[i] - local_w[i]) * (local_b[i] - local_w[i]);
-          *l2_squared += local_p[i];
+          l2_squared += local_p[i];
         }
       }
 
       //l2^2 = SUM(p's in column 0)
       double global_l2;
-      MPI_Allreduce(l2_squared, &global_l2, 1, MPI_DOUBLE, MPI_SUM, comm);
+      MPI_Allreduce(&l2_squared, &global_l2, 1, MPI_DOUBLE, MPI_SUM, comm);
 
-      if (global_rank == 0) {
-            std::cout << global_l2 << std::endl;
-        }
 
 
 
       free(local_p);
       free(local_w);
+
+
       if (sqrt(global_l2) <= l2_termination) {
-
-
-        free(l2_squared);
         free(local_D);
         free(local_R);
         return;
@@ -468,11 +459,11 @@ void mpi_jacobi(const int n, double* A, double* b, double* x, MPI_Comm comm,
     double* local_b = NULL;
     distribute_matrix(n, &A[0], &local_A, comm);
 
-    std::cout<<"full matrix distributed" << std::endl;
+
 
     distribute_vector(n, &b[0], &local_b, comm);
 
-    std::cout<< "vector distributed" << std::endl;
+
 
     // allocate local result space
     double* local_x = new double[block_decompose_by_dim(n, comm, 0)];

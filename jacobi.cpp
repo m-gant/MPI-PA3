@@ -98,7 +98,6 @@ void jacobi(const int n, double* A, double* b, double* x, int max_iter, double l
     	}
 
     	double l2_norm = sqrt(sum_of_squares);
-        std::cout << i << ":" << l2_norm << std::endl;
 
     	if (l2_norm < l2_termination) 
         {
