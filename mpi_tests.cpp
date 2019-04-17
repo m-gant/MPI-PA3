@@ -65,7 +65,7 @@ TEST(MpiTest, VectorDistribution1)
 TEST(MpiTest, MatrixVectorMult1)
 {
 
-    std::cout<<"testing matrix" <<std::endl;
+    //std::cout<<"testing matrix" <<std::endl;
     // simple 4 by 4 input matrix
     double A[4*4] = {10., -1., 2., 0.,
                            -1., 11., -1., 3.,
