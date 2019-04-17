@@ -74,7 +74,7 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 
         MPI_Scatterv(input_vector, send_counts, displacements,
             MPI_DOUBLE, *local_vector, local_vector_size, MPI_DOUBLE, 0, column_comm);
-
+        
 
         free(send_counts);
         free(displacements);
