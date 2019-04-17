@@ -77,6 +77,7 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 
         free(send_counts);
         free(displacements);
+        
     }
 
 
@@ -218,6 +219,8 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
         MPI_Status status;
         MPI_Recv(*local_matrix, matrix_size, MPI_DOUBLE, root_rank, 200, comm, &status);
     }
+
+    free(matrix_to_send);
 
 }
 
@@ -365,10 +368,12 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 
     //if in column zero, receive the diagonal elements and initialize x to 0
     if (col_j == 0) {
-      local_D = (double*) malloc(sizeof(double) * num_rows);
-      MPI_Status status;
-      MPI_Recv(local_D, num_rows, MPI_DOUBLE, row_i, 400, row_comm, &status);
+      if (row_i != 0) {
+        local_D = (double*) malloc(sizeof(double) * num_rows);
+        MPI_Status status;
+        MPI_Recv(local_D, num_rows, MPI_DOUBLE, row_i, 400, row_comm, &status);
 
+      }
       //initialize x to [0 0 ... 0] block distributed along first columns
       for (int i = 0; i < num_rows; i++) {
         local_x[i] = 0;
@@ -407,9 +412,6 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
       //l2^2 = SUM(p's in column 0)
       double global_l2;
       MPI_Allreduce(&l2_squared, &global_l2, 1, MPI_DOUBLE, MPI_SUM, comm);
-
-
-
 
       free(local_p);
       free(local_w);
@@ -459,11 +461,7 @@ void mpi_jacobi(const int n, double* A, double* b, double* x, MPI_Comm comm,
     double* local_b = NULL;
     distribute_matrix(n, &A[0], &local_A, comm);
 
-
-
     distribute_vector(n, &b[0], &local_b, comm);
-
-
 
     // allocate local result space
     double* local_x = new double[block_decompose_by_dim(n, comm, 0)];
