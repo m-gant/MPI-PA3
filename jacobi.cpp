@@ -14,6 +14,7 @@
 // my implementation:
 #include <iostream>
 #include <math.h>
+#include <stdlib.h>
 
 // Calculates y = A*x for a square n-by-n matrix A, and n-dimensional vectors x
 // and y
